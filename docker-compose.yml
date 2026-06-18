@@ -1,0 +1,67 @@
+# Job Match Assistant 開発環境
+#
+# 学習テーマ: docker-compose / service / network / volume / 環境変数 / depends_on
+#
+# `docker compose up` で db(PostgreSQL) / backend(Rails API) / frontend(Next.js) が起動する。
+# - サービス間はデフォルトネットワークで service 名(db/backend)で名前解決できる。
+# - db のポートはホストに公開しない（ホストで別の PostgreSQL が 5432 を使用中でも衝突しない）。
+# - コードは volume マウントしてホットリロードする。
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: backend_development
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    # backend は db の準備完了を待ってから起動する（healthcheck と組み合わせる）
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    # 初回起動時に DB を作成・マイグレーション・シードしてからサーバを起動。
+    # stale な pid が残っていても起動できるよう削除しておく。
+    command: bash -c "rm -f tmp/pids/server.pid && bin/rails db:prepare && bin/rails server -b 0.0.0.0 -p 3001"
+    environment:
+      DATABASE_HOST: db
+      DATABASE_USERNAME: ${POSTGRES_USER:-postgres}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      FRONTEND_ORIGIN: http://localhost:3000
+      RAILS_ENV: development
+      # LLM 連携(任意)。.env に設定があれば渡す。未設定ならスタブ応答。
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-haiku-4-5}
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    environment:
+      # fetch はブラウザで実行されるため、ホストから見た backend の URL を指定する
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:3001/api
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      # ホストの空 node_modules で上書きしないよう、コンテナ側を匿名ボリュームで保持
+      - /app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  db_data:

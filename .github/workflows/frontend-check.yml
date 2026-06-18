@@ -1,0 +1,40 @@
+# フロントエンド(Next.js)の型チェック・Lint・ビルドを push / PR で自動実行する。
+#
+# 学習テーマ: GitHub Actions / 型安全性とLintのCIゲート
+# 設計理由:
+# - テスト未導入のため、まずは「型が通る・Lintが通る・ビルドできる」を品質ゲートにする。
+
+name: frontend-check
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build

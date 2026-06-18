@@ -1,0 +1,32 @@
+# 開発用 Dockerfile（backend / Rails API）
+#
+# 学習テーマ: Dockerfile / image / レイヤキャッシュ
+# 設計理由:
+# - Rails 生成の本番用 Dockerfile は precompile や master_key 前提で重いため、
+#   「compose で起動して見せる」目的には dev 専用のこのファイルを使う。
+# - Gemfile/Gemfile.lock を先に COPY → bundle install することで、
+#   アプリのコード変更だけならこのレイヤがキャッシュされ再ビルドが速い。
+# - 実コードはマウントで反映するので、最後の COPY は初回起動用の最小限。
+
+FROM ruby:3.2.9-slim
+
+# pg gem のビルドに libpq-dev、ネイティブ拡張に build-essential、
+# psych(YAML) のビルドに libyaml-dev が必要
+RUN apt-get update -qq \
+  && apt-get install -y --no-install-recommends build-essential libpq-dev libyaml-dev pkg-config git \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Gemfile.lock の "BUNDLED WITH" に合わせたバージョンを使う
+RUN gem install bundler -v 4.0.3
+
+COPY Gemfile Gemfile.lock ./
+RUN bundle install
+
+COPY . .
+
+EXPOSE 3001
+
+# 既定の起動コマンド（compose 側で db:prepare 付きに上書きする）
+CMD ["bin/rails", "server", "-b", "0.0.0.0", "-p", "3001"]

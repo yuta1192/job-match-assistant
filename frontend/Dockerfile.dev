@@ -1,0 +1,21 @@
+# 開発用 Dockerfile（frontend / Next.js）
+#
+# 学習テーマ: Dockerfile / image / レイヤキャッシュ
+# 設計理由:
+# - package*.json を先に COPY → npm ci でキャッシュを効かせる。
+# - 実コードはマウントで反映。node_modules はコンテナ側を使うため
+#   compose 側で匿名ボリュームにして、ホストの空ディレクトリで上書きされないようにする。
+# - next dev はコンテナ外(ブラウザ)から届くよう 0.0.0.0 で待ち受ける。
+
+FROM node:22-slim
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+
+EXPOSE 3000
+
+CMD ["npx", "next", "dev", "-H", "0.0.0.0"]

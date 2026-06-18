@@ -1,0 +1,57 @@
+# バックエンド(Rails API)のテストを push / PR で自動実行する。
+#
+# 学習テーマ: GitHub Actions / CI / service コンテナ(Postgres) / 環境変数
+# 設計理由:
+# - Postgres を service コンテナで起動し、ENV(DATABASE_HOST 等)で接続先を渡す。
+#   database.yml が ENV を読む構成なので、ローカル(ソケット)とCI(TCP)を両立できる。
+# - schema.rb を読み込むだけにして seed は実行しない（テストは FactoryBot で用意する）。
+# - LLM は spec 内で fake client を注入してモックするため、APIキーは不要。
+
+name: backend-test
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  rspec:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      RAILS_ENV: test
+      DATABASE_HOST: localhost
+      DATABASE_USERNAME: postgres
+      DATABASE_PASSWORD: postgres
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.2.9
+          bundler-cache: true
+          working-directory: backend
+
+      - name: Prepare test database
+        run: bin/rails db:create db:schema:load
+
+      - name: Run RSpec
+        run: bundle exec rspec
