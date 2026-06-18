@@ -49,22 +49,26 @@ export default function JobPostingDetailPage() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   // 求人本体・分析・返信・メモをまとめて取得する。分析/生成の後にも呼び直す。
-  const load = useCallback(async () => {
-    const [jobRes, analysisRes, repliesRes, memosRes] = await Promise.all([
+  // setState は .then コールバック内(=非同期の境界の後)で呼ぶ。
+  // これにより useEffect から直接呼んでも「同期的なsetState」と見なされない。
+  // Promise を返すので、ボタンのハンドラから `await load()` で再取得できる。
+  const load = useCallback(() => {
+    return Promise.all([
       fetchJobPosting(id),
       fetchAnalysisResult(id),
       fetchReplies(id),
       fetchInterviewMemos(id),
-    ]);
-    if (!jobRes.ok) {
-      setError(jobRes.message);
-    } else {
-      setJob(jobRes.data);
-      if (analysisRes.ok) setAnalysis(analysisRes.data);
-      if (repliesRes.ok) setReplies(repliesRes.data);
-      if (memosRes.ok) setMemos(memosRes.data);
-    }
-    setLoading(false);
+    ]).then(([jobRes, analysisRes, repliesRes, memosRes]) => {
+      if (!jobRes.ok) {
+        setError(jobRes.message);
+      } else {
+        setJob(jobRes.data);
+        if (analysisRes.ok) setAnalysis(analysisRes.data);
+        if (repliesRes.ok) setReplies(repliesRes.data);
+        if (memosRes.ok) setMemos(memosRes.data);
+      }
+      setLoading(false);
+    });
   }, [id]);
 
   useEffect(() => {
