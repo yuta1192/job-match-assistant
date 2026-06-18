@@ -1,0 +1,46 @@
+# Render Blueprint / バックエンド(Rails API) + PostgreSQL を1ファイルで定義
+#
+# 学習テーマ: IaC的なデプロイ定義 / 環境変数 / マネージドDB接続
+# 使い方:
+#   Render ダッシュボードで "New +" → "Blueprint" → このリポジトリを選択すると、
+#   web サービス(API)と PostgreSQL が自動作成される。
+#   sync: false の環境変数(RAILS_MASTER_KEY / FRONTEND_ORIGIN / ANTHROPIC_API_KEY)は
+#   作成後にダッシュボードで手入力する。
+
+databases:
+  - name: job-match-assistant-db
+    databaseName: job_match_assistant
+    plan: free
+
+services:
+  - type: web
+    name: job-match-assistant-api
+    runtime: ruby
+    plan: free
+    rootDir: backend
+    # 初回・更新時に依存導入とマイグレーションを実行
+    buildCommand: "bundle install && bundle exec rails db:migrate"
+    startCommand: "bundle exec rails server"
+    healthCheckPath: /up
+    envVars:
+      - key: RAILS_ENV
+        value: production
+      # ログを標準出力へ（Renderのログで確認できる）
+      - key: RAILS_LOG_TO_STDOUT
+        value: "true"
+      # credentials.yml.enc を復号する鍵。ローカルの backend/config/master.key の中身を貼る
+      - key: RAILS_MASTER_KEY
+        sync: false
+      # 上の Postgres から接続文字列を自動注入（Rails は DATABASE_URL を優先）
+      - key: DATABASE_URL
+        fromDatabase:
+          name: job-match-assistant-db
+          property: connectionString
+      # CORS 許可オリジン。Vercel のフロントURLを入れる（例: https://job-match-assistant.vercel.app）
+      - key: FRONTEND_ORIGIN
+        sync: false
+      # LLM(任意)。未設定ならスタブ応答のまま動く
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_MODEL
+        value: claude-haiku-4-5

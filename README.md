@@ -149,6 +149,12 @@ cd frontend && npm run dev   # → http://localhost:3000
 
 ローカル直起動では Rails は Unix ドメインソケットで PostgreSQL に接続します（`config/database.yml` は環境変数が無ければソケット接続）。
 
+### デプロイ
+
+フロントエンドを **Vercel**、バックエンド(API)と PostgreSQL を **Render**（ルートの `render.yaml` Blueprint）にデプロイします。手順は [`docs/deployment.md`](docs/deployment.md) を参照。
+
+> CI: push / PR で GitHub Actions が RSpec（backend）と型チェック/Lint/build（frontend）を自動実行します。
+
 ---
 
 ## 今後の改善
