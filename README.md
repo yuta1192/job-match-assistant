@@ -1,6 +1,11 @@
 # Job Match Assistant
 
+[![backend-test](https://github.com/yuta1192/job-match-assistant/actions/workflows/backend-test.yml/badge.svg)](https://github.com/yuta1192/job-match-assistant/actions/workflows/backend-test.yml)
+[![frontend-check](https://github.com/yuta1192/job-match-assistant/actions/workflows/frontend-check.yml/badge.svg)](https://github.com/yuta1192/job-match-assistant/actions/workflows/frontend-check.yml)
+
 求人情報とスキルプロフィールをもとに、**技術スタック抽出・マッチ分析・懸念点整理・面談質問・返信文案**を LLM API で生成し、応募ステータスと面談メモまで一元管理する転職活動支援アプリです。
+
+> **デモURL**: （デプロイ後に記載 — フロント: Vercel / API: Render。手順は [`docs/deployment.md`](docs/deployment.md)）
 
 > Rails 実務経験を土台に、TypeScript / React / Next.js / LLM API / Docker / CI/CD を「実装で」キャッチアップするためのポートフォリオを兼ねています。
 
@@ -64,25 +69,88 @@ job_match_assistant/
 
 ---
 
+## スクリーンショット
+
+> デプロイ後 or `docker compose up`（http://localhost:3000）で各画面を撮影して貼る。
+> 推奨: 求人一覧 / 求人詳細（分析・返信文付き）/ スキルプロフィール。
+> 例: `docs/images/job-list.png` を用意し `![求人一覧](docs/images/job-list.png)` を追記。
+
 ## ER 図
 
-> Phase 3（Rails API / PostgreSQL）で確定後にここへ追記する。
+`JobPosting` を中心に、技術スタック・分析結果・返信文・面談メモがぶら下がる構成。
 
-主要エンティティ: `SkillProfile` / `JobPosting` / `JobTechStack` / `AnalysisResult` / `GeneratedReply` / `InterviewMemo`
+```mermaid
+erDiagram
+  SKILL_PROFILES {
+    bigint id PK
+    text summary
+    text_array main_skills
+    text_array learning_skills
+  }
+  JOB_POSTINGS {
+    bigint id PK
+    string company_name
+    string title
+    text description
+    string employment_type
+    string status
+  }
+  JOB_TECH_STACKS {
+    bigint id PK
+    bigint job_posting_id FK
+    string name
+    string category
+    string importance
+  }
+  ANALYSIS_RESULTS {
+    bigint id PK
+    bigint job_posting_id FK
+    text_array matched_points
+    text_array weak_points
+    text raw_response
+  }
+  GENERATED_REPLIES {
+    bigint id PK
+    bigint job_posting_id FK
+    text body
+    string tone
+  }
+  INTERVIEW_MEMOS {
+    bigint id PK
+    bigint job_posting_id FK
+    date interview_date
+    integer motivation_level
+  }
+
+  JOB_POSTINGS ||--o{ JOB_TECH_STACKS : "has many"
+  JOB_POSTINGS ||--o| ANALYSIS_RESULTS : "has one"
+  JOB_POSTINGS ||--o{ GENERATED_REPLIES : "has many"
+  JOB_POSTINGS ||--o{ INTERVIEW_MEMOS : "has many"
+```
+
+> `SkillProfile` はアプリ全体で1件のみ運用（自分の情報）。分析時に `JobPosting` と突き合わせて使う。
 
 ---
 
 ## API 一覧
 
-> Phase 3 で実装後に確定。設計案は [`docs/design.md`](docs/design.md) を参照。
+全エンドポイントは `/api` 名前空間。入出力は camelCase（フロントの型と一致させるため、コントローラ層で snake_case ⇄ camelCase を変換）。
 
-代表例:
-
-- `GET/POST/PATCH/DELETE /api/job_postings`
-- `GET/POST/PATCH /api/skill_profile`
-- `POST /api/job_postings/:id/analyze`
-- `POST /api/job_postings/:id/generate_reply`
-- `/api/job_postings/:id/interview_memos`
+| メソッド | パス | 用途 |
+| --- | --- | --- |
+| GET | `/api/job_postings` | 求人一覧 |
+| POST | `/api/job_postings` | 求人登録 |
+| GET | `/api/job_postings/:id` | 求人詳細（技術スタック含む） |
+| PATCH | `/api/job_postings/:id` | 求人更新 |
+| DELETE | `/api/job_postings/:id` | 求人削除 |
+| GET | `/api/skill_profile` | スキルプロフィール取得 |
+| POST/PATCH | `/api/skill_profile` | スキルプロフィール作成/更新 |
+| POST | `/api/job_postings/:id/analyze` | **マッチ分析（LLM）** |
+| GET | `/api/job_postings/:id/analysis_result` | 分析結果取得 |
+| POST | `/api/job_postings/:id/generate_reply` | **返信文生成（LLM）** |
+| GET | `/api/job_postings/:id/generated_replies` | 返信文一覧 |
+| GET/POST | `/api/job_postings/:id/interview_memos` | 面談メモ 一覧/作成 |
+| PATCH/DELETE | `/api/interview_memos/:id` | 面談メモ 更新/削除 |
 
 ---
 

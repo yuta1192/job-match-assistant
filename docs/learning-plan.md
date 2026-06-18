@@ -5,6 +5,10 @@ Udemy・書籍で学んだ内容を Job Match Assistant のどの機能に落と
 
 ---
 
+## 進捗
+
+Phase 1〜7 実装済み（GitHub公開・CI緑・デプロイ準備完了）。Phase 8 仕上げ中。実デプロイ(Vercel/Render)は各自アカウントで実施。
+
 ## 全体スケジュール（〜7月末）
 
 | Phase | 期間 | テーマ | 主な成果物 |

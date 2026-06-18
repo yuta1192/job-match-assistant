@@ -18,7 +18,7 @@
 転職活動で複数求人を比較する際、技術スタックの読み取り、自分の経験とのマッチ整理、返信文作成に時間がかかっていた。これを LLM で効率化しつつ、モダンスタックを実装で学ぶために開発した。
 
 ### 2. 技術構成（30秒）
-フロントは Next.js / TypeScript、バックは Rails API + PostgreSQL、LLM は OpenAI/Anthropic の公式 API を直接利用。Docker で開発環境を統一し、GitHub Actions で RSpec を自動実行。
+フロントは Next.js(App Router) / TypeScript、バックは Rails API + PostgreSQL。LLM は Anthropic の Messages API を **Net::HTTP で直接呼び出し**（SDKを使わず、リクエスト/レスポンス/エラー処理を自分で扱う）。コスト最小の Haiku を既定にし、ENVでモデル変更可。Docker で開発環境を統一し、GitHub Actions で RSpec と型/Lint/build を自動実行（CI緑）。GitHub に公開済み。
 
 ### 3. 機能デモ（2分）
 - 求人を登録 → 分析実行で技術スタック抽出・マッチ分析
@@ -28,9 +28,11 @@
 
 ### 4. 設計上の工夫（1.5分）
 - **型から仕様を表現** — TypeScript で主要データ型を先に定義し、画面・API がそれを参照
-- **LLM 出力の安定化** — JSON 形式で固定、`raw_response` を保存して再現性・デバッグ性を確保
-- **責務分離** — LLM 呼び出しは Service Object に切り出し、コントローラを薄く保つ
-- **テスト** — LLM 部分は mock し、push 時に CI でテストを走らせる
+- **camelCase ⇄ snake_case の橋渡し** — フロント型は camelCase、Rails/DBは snake_case。gemを足さず ApplicationController の小さな変換で両者を接続（仕組みが見えるので説明できる）
+- **DBは3環境を同一コードで両立** — `database.yml` をENV化し、ローカル(ソケット)/Docker(TCP)/本番(DATABASE_URL) を切替なしで運用
+- **LLM 出力の安定化** — JSON 形式で固定し、フェンス除去＋波括弧抽出＋失敗時例外でパースを安定化。`raw_response` を保存して再現性・デバッグ性を確保。キー未設定時はスタブ応答で動作確認可
+- **責務分離 + テスト容易性** — LLM 呼び出しは Service Object に切り出し、クライアントを注入可能にして、テストでは fake client を注入（ネットワーク/課金なし）
+- **CIで自分の見落としを検出** — push時にRSpecと型/Lint/buildを実行。実際に Lint がローカル見落としを検出し修正した経験を説明できる
 
 ### 5. AI 活用方針（30秒）
 Claude Code / Cursor は実装案比較・テスト観点・リファクタ検討・ドキュメント補助に利用。設計判断・レビュー・動作確認は自分で実施し、生成コードはそのまま採用せず責務・例外・セキュリティを確認して取り込んだ。
